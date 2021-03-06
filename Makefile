@@ -1,25 +1,40 @@
 
-TARGETS := galen.yaml viper.yaml
+TARGETS := galen.img viper-01.img
+
+GALEN_VERSION=4
+VIPER_VERSION=3
+
+DEBIAN_VERSION=bullseye
 
 all: $(TARGETS)
 
-galen.yaml: utils/image-specs/raspi_master.yaml
-	@echo "building $@ from pi3"
-	@cat $^ | sed "s/__ARCH__/arm64/" | \
-	sed "s/__LINUX_IMAGE__/linux-image-arm64/" | \
-	sed "s/__EXTRA_PKGS__/- firmware-brcm80211/" | \
-	sed "s/__DTB__/\\/usr\\/lib\\/linux-image-*-arm64\\/broadcom\\/bcm*rpi*.dtb/" |\
-	sed "s/__OTHER_APT_ENABLE__//" |\
-	sed "s/__HOST__/galen/" > $@
 
-viper.yaml:
-	@echo "building $@"
-	@touch $@
+utils/image-specs/raspi_%_${DEBIAN_VERSION}.yaml:
+	@echo .
+	@echo "building $(notdir $@)"
+	@echo .
+	@make -C utils/image-specs $(notdir $@)
+
+
+galen.yaml: utils/image-specs/raspi_${GALEN_VERSION}_${DEBIAN_VERSION}.yaml
+	@echo
+	@echo "building $@ from $^"
+	@echo
+	@cat $^ | sed 's/rpi_${GALEN_VERSION}-\$$(date +%Y%m%d)/galen/' >$@
+
+viper-%.yaml: utils/image-specs/raspi_${VIPER_VERSION}_${DEBIAN_VERSION}.yaml
+	@echo
+	@echo "building $@ from $^"
+	@echo
+	@cat $^ | sed "s/rpi_${VIPER_VERSION}-\$$(date +%Y%m%d)/$(subst .yaml,,$@)/" >$@
 
 %.img: %.yaml
+	@echo
+	@echo "building $@ from $^"
+	@echo
 	@touch $(@:.img=.log)
 	@time nice vmdb2 --verbose \
-		--rootfs-tarball=$(subst .img,.tar.gz,$@) \
+		--rootfs-tarball=${DEBIAN_VERSION}.tar.gz \
 		--output=$@ $(subst .img,.yaml,$@) \
 		--log $(subst .img,.log,$@)
 	@chmod 0644 $@ $(@,.img=.log)
